@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Quiz Game</title>
+    <style>
+        /* Base Page Setup */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f6f8fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        /* Quiz Box Container */
+        .quiz-container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        /* Top Progress Bar Details */
+        .quiz-header {
+            display: flex;
+            justify-content: space-between;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #edf2f7;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #2d3748;
+            font-size: 1.3rem;
+            margin-top: 0;
+            margin-bottom: 25px;
+            line-height: 1.4;
+        }
+
+        /* Answer Choices Layout */
+        .options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .option-btn {
+            background-color: #ffffff;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 14px 20px;
+            font-size: 1rem;
+            text-align: left;
+            cursor: pointer;
+            color: #4a5568;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        .option-btn:hover:not(:disabled) {
+            background-color: #f7fafc;
+            border-color: #cbd5e0;
+        }
+
+        /* Visual Answer Verification States */
+        .option-btn.correct {
+            background-color: #c6f6d5;
+            border-color: #48bb78;
+            color: #22543d;
+            font-weight: bold;
+        }
+
+        .option-btn.wrong {
+            background-color: #fed7d7;
+            border-color: #f56565;
+            color: #742a2a;
+        }
+
+        /* Navigation Buttons */
+        .next-btn {
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            float: right;
+            transition: background 0.2s;
+        }
+
+        .next-btn:hover {
+            background-color: #2b6cb0;
+        }
+
+        /* Utility Hide State */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Score Summary Screen Layout */
+        .results-screen {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .score-display {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #3182ce;
+            margin: 20px 0;
+        }
+
+        .restart-btn {
+            background-color: #4a5568;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="quiz-container">
+        <!-- Main Quiz Interface Screen -->
+        <div id="quizBlock">
+            <div class="quiz-header">
+                <span id="progressText">Question 1 of 3</span>
+                <span id="scoreText">Score: 0</span>
+            </div>
+            <h2 id="questionText">Loading question text...</h2>
+            <div id="optionsContainer" class="options-list">
+                <!-- Answer choice buttons dynamically generated here -->
+            </div>
+            <button id="nextBtn" class="next-btn hidden">Next Question</button>
+            <div style="clear: both;"></div>
+        </div>
+
+        <!-- End of Game Score Summary Screen -->
+        <div id="resultsBlock" class="results-screen hidden">
+            <h2>Quiz Complete! 🎉</h2>
+            <p>Your final tally is:</p>
+            <div id="finalScore" class="score-display">0 / 0</div>
+            <button id="restartBtn" class="restart-btn">Try Again</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Quiz Question Bank Data Storage ---
+        const quizData = [
+            {
+                question: "Which HTML element is used to link a JavaScript file?",
+                options: ["<link>", "<script>", "<js>", "<href>"],
+                correct: 1 // Index mapping to "<script>"
+            },
+            {
+                question: "What is the correct way to write an event listener click hook in JS?",
+                options: ["element.click()", "element.addEventListener('click', callback)", "element.on('click')", "element.listen('click')"],
+                correct: 1
+            },
+            {
+                question: "Which CSS property is used to change the background color of an element?",
+                options: ["color", "bg-color", "background-color", "surface-color"],
+                correct: 2
+            }
+        ];
+
+        // --- 2. Tracking State Variables ---
+        let currentQuestionIndex = 0;
+        let runningScore = 0;
+        let hasAnswered = false;
+
+        // --- 3. DOM Elements Selection ---
+        const quizBlock = document.getElementById('quizBlock');
+        const resultsBlock = document.getElementById('resultsBlock');
+        const questionText = document.getElementById('questionText');
+        const optionsContainer = document.getElementById('optionsContainer');
+        const progressText = document.getElementById('progressText');
+        const scoreText = document.getElementById('scoreText');
+        const nextBtn = document.getElementById('nextBtn');
+        const finalScore = document.getElementById('finalScore');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // --- 4. Game Cycle Core Functions ---
+        function loadQuestion() {
+            hasAnswered = false;
+            nextBtn.classList.add('hidden'); // Keep next hidden until user commits
+            optionsContainer.innerHTML = ''; // Wipe past button markup clean
+
+            // Fetch target structural data row
+            const currentData = quizData[currentQuestionIndex];
+
+            // Render text updates
+            progressText.textContent = `Question ${currentQuestionIndex + 1} of ${quizData.length}`;
+            scoreText.textContent = `Score: ${runningScore}`;
+            questionText.textContent = currentData.question;
+
+            // Generate layout action buttons loop
+            currentData.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.classList.add('option-btn');
+                
+                // Attach option choice evaluation trigger hook
+                button.addEventListener('click', () => selectOption(index, button));
+                
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        function selectOption(selectedIndex, selectedButton) {
+            // Early exit safeguard to stop user changing their guess after clicking
+            if (hasAnswered) return;
+            hasAnswered = true;
+
+            const currentData = quizData[currentQuestionIndex];
+            const correctIndex = currentData.correct;
+            const allOptionButtons = optionsContainer.querySelectorAll('.option-btn');
+
+            // Block further click selections and display verification colors
+            allOptionButtons.forEach((btn, index) => {
+                btn.disabled = true;
+                if (index === correctIndex) {
+                    btn.classList.add('correct'); // Highlight answer target green
+                }
+            });
+
+            if (selectedIndex === correctIndex) {
+                runningScore++;
+                scoreText.textContent = `Score: ${runningScore}`;
+            } else {
+                selectedButton.classList.add('wrong'); // Flash user misstep button red
+            }
+
+            nextBtn.classList.remove('hidden'); // Present navigation step toggle
+        }
+
+        function handleNext() {
+            currentQuestionIndex++;
+            
+            if (currentQuestionIndex < quizData.length) {
+                loadQuestion();
+            } else {
+                // Show final summary panel
+                quizBlock.classList.add('hidden');
+                resultsBlock.classList.remove('hidden');
+                finalScore.textContent = `${runningScore} / ${quizData.length}`;
+            }
+        }
+
+        function resetQuiz() {
+            currentQuestionIndex = 0;
+            runningScore = 0;
+            resultsBlock.classList.add('hidden');
+            quizBlock.classList.remove('hidden');
+            loadQuestion();
+        }
+
+        // --- 5. Event Listeners ---
+        nextBtn.addEventListener('click', handleNext);
+        restartBtn.addEventListener('click', resetQuiz);
+
+        // --- 6. Initial Kickoff Call ---
+        loadQuestion();
+    </script>
+
+</body>
+</html>
